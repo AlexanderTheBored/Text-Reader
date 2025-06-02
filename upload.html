@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Multi-Chapter FanFic Uploader</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900 p-6 font-sans">
+
+  <div class="max-w-3xl mx-auto bg-white p-6 rounded shadow">
+    <h1 class="text-2xl font-bold mb-4">Multi-Chapter FanFic Uploader</h1>
+
+    <form id="storyForm" class="space-y-4">
+      <input type="file" id="fileInput" accept=".txt" class="block w-full" required />
+
+      <input type="text" id="storyTitle" placeholder="Story Title" class="w-full border p-2 rounded" required />
+      <input type="text" id="storyAuthor" placeholder="Author" class="w-full border p-2 rounded" required />
+
+      <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Convert to Multi-Chapter JSON</button>
+    </form>
+
+    <div id="outputContainer" class="mt-6 hidden">
+      <h2 class="text-xl font-semibold mb-2">Generated JSON:</h2>
+      <textarea id="jsonOutput" class="w-full h-64 border p-2 rounded font-mono text-sm"></textarea>
+      <a id="downloadLink" class="mt-2 inline-block text-blue-600 underline" download="story.json">Download JSON</a>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("storyForm");
+    const fileInput = document.getElementById("fileInput");
+    const outputContainer = document.getElementById("outputContainer");
+    const jsonOutput = document.getElementById("jsonOutput");
+    const downloadLink = document.getElementById("downloadLink");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const file = fileInput.files[0];
+      const title = document.getElementById("storyTitle").value;
+      const author = document.getElementById("storyAuthor").value;
+
+      if (!file) return;
+
+      const text = await file.text();
+
+      // Split chapters by pattern: - Chapter X -
+      const rawChapters = text.split(/- Chapter\s+\d+ -/gi).map(c => c.trim()).filter(c => c.length > 0);
+
+      // Generate chapter objects with generic titles
+      const chapters = rawChapters.map((chText, i) => ({
+        title: `Chapter ${i + 1}`,
+        text: chText
+      }));
+
+      const storyJSON = {
+        title,
+        author,
+        chapters
+      };
+
+      const jsonStr = JSON.stringify(storyJSON, null, 2);
+      jsonOutput.value = jsonStr;
+      outputContainer.classList.remove("hidden");
+
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      downloadLink.href = url;
+    });
+  </script>
+</body>
+</html>

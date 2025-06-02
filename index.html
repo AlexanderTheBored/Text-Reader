@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-white text-black dark:bg-gray-900 dark:text-white">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FanFic Reader</title>
+
+  <!-- Roboto Light from Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      font-weight: 300;
+    }
+    /* Scroll to top button styles */
+    #scrollTopBtn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: #1f2937; /* Tailwind slate-800 */
+      color: white;
+      border: none;
+      border-radius: 9999px;
+      width: 40px;
+      height: 40px;
+      font-size: 24px;
+      display: none; /* hidden by default */
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 1000;
+    }
+
+    /* Show button only on small screens (mobile) */
+    @media (max-width: 640px) {
+      #scrollTopBtn {
+        display: flex;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center px-4 py-6 transition-colors duration-300">
+
+  <!-- Title & Navigation -->
+  <div class="w-full max-w-3xl mb-4">
+    <div class="flex justify-between items-center mb-2">
+      <h1 id="storyTitle" class="text-2xl font-bold">Loading title...</h1>
+      <button id="toggleTheme" class="text-sm border px-2 py-1 rounded">Toggle Theme</button>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <p class="text-sm">By <span id="storyAuthor" class="font-semibold">Author</span></p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="prevBtn" class="px-2 py-1 border rounded">Prev</button>
+
+        <select id="chapterSelectTop" class="px-2 py-1 border rounded text-black">
+          <!-- Options populated dynamically -->
+        </select>
+
+        <button id="nextBtn" class="px-2 py-1 border rounded">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Story Content -->
+  <div
+    id="storyText"
+    class="w-full max-w-3xl text-lg leading-relaxed whitespace-pre-wrap bg-white dark:bg-gray-800 p-6 rounded shadow"
+  >
+    Loading story...
+  </div>
+
+  <!-- Controls -->
+  <div class="w-full max-w-3xl mt-4 flex justify-between items-center">
+    <div>
+      <label for="fontSize" class="mr-2 text-sm">Font Size</label>
+      <input type="range" id="fontSize" min="14" max="24" value="18" />
+    </div>
+    <button class="text-sm underline">Bookmark this chapter</button>
+  </div>
+
+  <!-- Bottom Chapter Selector -->
+  <div class="w-full max-w-3xl mt-8 mb-8 flex justify-center">
+    <select id="chapterSelectBottom" class="px-2 py-1 border rounded text-black w-full max-w-md">
+      <!-- Options populated dynamically -->
+    </select>
+  </div>
+
+  <!-- Scroll to Top Button -->
+  <button id="scrollTopBtn" title="Go to top" aria-label="Scroll to top">&#8679;</button>
+
+  <script>
+    const storyTitle = document.getElementById('storyTitle');
+    const storyAuthor = document.getElementById('storyAuthor');
+    const storyText = document.getElementById('storyText');
+    const chapterSelectTop = document.getElementById('chapterSelectTop');
+    const chapterSelectBottom = document.getElementById('chapterSelectBottom');
+    const fontSize = document.getElementById('fontSize');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const toggleTheme = document.getElementById('toggleTheme');
+    const scrollTopBtn = document.getElementById('scrollTopBtn');
+
+    let story = null;
+    let currentIndex = 0; // includes synopsis as 0
+
+    async function loadStory() {
+      const res = await fetch('story.json');
+      story = await res.json();
+
+      storyTitle.textContent = story.title;
+      storyAuthor.textContent = story.author;
+
+      // Clear selects just in case
+      chapterSelectTop.innerHTML = '';
+      chapterSelectBottom.innerHTML = '';
+
+      // Add synopsis as first option
+      const synopsisOptionTop = document.createElement('option');
+      synopsisOptionTop.value = 0;
+      synopsisOptionTop.textContent = 'Synopsis';
+      chapterSelectTop.appendChild(synopsisOptionTop);
+
+      const synopsisOptionBottom = synopsisOptionTop.cloneNode(true);
+      chapterSelectBottom.appendChild(synopsisOptionBottom);
+
+      // Add chapters starting from index 1
+      story.chapters.forEach((ch, i) => {
+        const optionTop = document.createElement('option');
+        optionTop.value = i + 1;
+        optionTop.textContent = `Chapter ${i + 1}: ${ch.title}`;
+        chapterSelectTop.appendChild(optionTop);
+
+        const optionBottom = optionTop.cloneNode(true);
+        chapterSelectBottom.appendChild(optionBottom);
+      });
+
+      renderContent(0);
+    }
+
+    function renderContent(index) {
+      currentIndex = index;
+      chapterSelectTop.value = index;
+      chapterSelectBottom.value = index;
+
+      if (index === 0) {
+        storyText.textContent = story.synopsis;
+      } else {
+        const chapter = story.chapters[index - 1];
+        storyText.textContent = chapter.text;
+      }
+    }
+
+    // Sync selects when one changes
+    function onSelectChange(e) {
+      const index = parseInt(e.target.value);
+      renderContent(index);
+    }
+
+    chapterSelectTop.addEventListener('change', onSelectChange);
+    chapterSelectBottom.addEventListener('change', onSelectChange);
+
+    prevBtn.addEventListener('click', () => {
+      if (currentIndex > 0) renderContent(currentIndex - 1);
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (currentIndex < story.chapters.length) renderContent(currentIndex + 1);
+    });
+
+    fontSize.addEventListener('input', () => {
+      storyText.style.fontSize = fontSize.value + 'px';
+    });
+
+    toggleTheme.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+    });
+
+    scrollTopBtn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    loadStory();
+  </script>
+</body>
+</html>
