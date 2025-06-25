@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Multi-Chapter FanFic Uploader</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/epubjs/dist/epub.min.js"></script>
 </head>
 <body class="bg-gray-100 text-gray-900 p-6 font-sans">
 
@@ -12,12 +14,22 @@
     <h1 class="text-2xl font-bold mb-4">Multi-Chapter FanFic Uploader</h1>
 
     <form id="storyForm" class="space-y-4">
-      <input type="file" id="fileInput" accept=".txt" class="block w-full" required />
+      <label class="block font-semibold">Select File Type:</label>
+      <select id="fileType" class="w-full border p-2 rounded">
+        <option value="txt">Plain Text (.txt)</option>
+        <option value="epub">EPUB (.epub)</option>
+      </select>
+
+      <input type="file" id="fileInput" accept=".txt,.epub" class="block w-full" required />
 
       <input type="text" id="storyTitle" placeholder="Story Title" class="w-full border p-2 rounded" required />
       <input type="text" id="storyAuthor" placeholder="Author" class="w-full border p-2 rounded" required />
 
-      <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Convert to Multi-Chapter JSON</button>
+      <textarea id="storySynopsis" placeholder="Synopsis (optional)" class="w-full border p-2 rounded"></textarea>
+
+      <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+        Convert to Multi-Chapter JSON
+      </button>
     </form>
 
     <div id="outputContainer" class="mt-6 hidden">
@@ -30,6 +42,7 @@
   <script>
     const form = document.getElementById("storyForm");
     const fileInput = document.getElementById("fileInput");
+    const fileType = document.getElementById("fileType");
     const outputContainer = document.getElementById("outputContainer");
     const jsonOutput = document.getElementById("jsonOutput");
     const downloadLink = document.getElementById("downloadLink");
@@ -38,25 +51,42 @@
       e.preventDefault();
 
       const file = fileInput.files[0];
+      const type = fileType.value;
       const title = document.getElementById("storyTitle").value;
       const author = document.getElementById("storyAuthor").value;
+      const synopsis = document.getElementById("storySynopsis").value;
 
       if (!file) return;
 
-      const text = await file.text();
+      let chapters = [];
 
-      // Split chapters by pattern: - Chapter X -
-      const rawChapters = text.split(/- Chapter\s+\d+ -/gi).map(c => c.trim()).filter(c => c.length > 0);
+      if (type === "txt") {
+        const text = await file.text();
+        const rawChapters = text.split(/- Chapter\s+\d+ -/gi).map(c => c.trim()).filter(c => c.length > 0);
+        chapters = rawChapters.map((chText, i) => ({
+          title: `Chapter ${i + 1}`,
+          text: chText
+        }));
+      } else if (type === "epub") {
+        const epub = ePub(file);
+        await epub.ready;
 
-      // Generate chapter objects with generic titles
-      const chapters = rawChapters.map((chText, i) => ({
-        title: `Chapter ${i + 1}`,
-        text: chText
-      }));
+        const spineItems = epub.spine.spineItems;
+        for (let i = 0; i < spineItems.length; i++) {
+          const item = spineItems[i];
+          const content = await item.load().then(() => item.rendered || item.contents.text()).catch(() => "");
+          chapters.push({
+            title: item.displayLabel || `Chapter ${i + 1}`,
+            text: content.replace(/<[^>]+>/g, "") // Strip HTML tags
+          });
+          item.unload(); // Free memory
+        }
+      }
 
       const storyJSON = {
         title,
         author,
+        ...(synopsis && { synopsis }),
         chapters
       };
 
